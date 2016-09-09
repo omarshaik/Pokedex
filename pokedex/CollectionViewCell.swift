@@ -41,7 +41,10 @@ class CollectionViewCell: UICollectionViewCell {
                         if let image = image {
                             if let currentPokemon = self.pokemon {
                                 if currentPokemon.id.integerValue == originalPokemon.id.integerValue {
-                                    self.imageView.image = image
+                                    dispatch_async(dispatch_get_main_queue(), {
+                                        self.imageView.image = image
+                                    })
+
                                 }
                             }
                         }

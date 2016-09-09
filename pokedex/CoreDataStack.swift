@@ -8,15 +8,16 @@
 
 import CoreData
 
-struct CoreDataStack {
+class CoreDataStack {
     
     // MARK:  - Properties
     private let model : NSManagedObjectModel
     private let coordinator : NSPersistentStoreCoordinator
     private let modelURL : NSURL
     private let dbURL : NSURL
-    let context : NSManagedObjectContext
-    
+    let mainContext : NSManagedObjectContext
+    let backgroundContext : NSManagedObjectContext
+
     // MARK:  - Initializers
     init?(modelName: String){
         
@@ -40,9 +41,13 @@ struct CoreDataStack {
         coordinator = NSPersistentStoreCoordinator(managedObjectModel: model)
         
         // create a context and add connect it to the coordinator
-        context = NSManagedObjectContext(concurrencyType: .MainQueueConcurrencyType)
-        context.persistentStoreCoordinator = coordinator
-        context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+        mainContext = NSManagedObjectContext(concurrencyType: .MainQueueConcurrencyType)
+        mainContext.persistentStoreCoordinator = coordinator
+        mainContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+
+        backgroundContext = NSManagedObjectContext(concurrencyType: .PrivateQueueConcurrencyType)
+        backgroundContext.persistentStoreCoordinator = coordinator
+        backgroundContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
         
         // Add a SQLite store located in the documents folder
         let fm = NSFileManager.defaultManager()
@@ -64,6 +69,9 @@ struct CoreDataStack {
         }catch{
             print("unable to add store at \(dbURL)")
         }
+
+        NSNotificationCenter.defaultCenter().addObserver(self, selector: #selector(contextDidSave(_:)), name: NSManagedObjectContextDidSaveNotification, object: mainContext)
+        NSNotificationCenter.defaultCenter().addObserver(self, selector: #selector(contextDidSave(_:)), name: NSManagedObjectContextDidSaveNotification, object: backgroundContext)
     }
     
     // MARK:  - Utils
@@ -74,6 +82,20 @@ struct CoreDataStack {
         
         try coordinator.addPersistentStoreWithType(NSSQLiteStoreType, configuration: nil, URL: dbURL, options: options)
         
+    }
+
+    @objc func contextDidSave(notification: NSNotification) {
+        if let sender = notification.object as? NSManagedObjectContext {
+            if sender == self.mainContext {
+                self.backgroundContext.performBlock({ 
+                    self.backgroundContext.mergeChangesFromContextDidSaveNotification(notification)
+                })
+            } else if sender == self.backgroundContext {
+                self.mainContext.performBlock({ 
+                    self.mainContext.mergeChangesFromContextDidSaveNotification(notification)
+                })
+            }
+        }
     }
 }
 
@@ -95,14 +117,29 @@ extension CoreDataStack  {
 // MARK:  - Save
 extension CoreDataStack {
     
-    func saveContext() {
-        do {
-            if context.hasChanges {
-                try context.save()
+    func saveMainContext() {
+        mainContext.performBlock { 
+            do {
+                if self.mainContext.hasChanges {
+                    try self.mainContext.save()
+                }
+            }
+            catch let error as NSError {
+                print(error.localizedDescription)
             }
         }
-        catch let error as NSError {
-            print(error.localizedDescription)
+    }
+
+    func saveBackgroundContext() {
+        backgroundContext.performBlock {
+            do {
+                if self.backgroundContext.hasChanges {
+                    try self.backgroundContext.save()
+                }
+            }
+            catch let error as NSError {
+                print(error.localizedDescription)
+            }
         }
     }
 }

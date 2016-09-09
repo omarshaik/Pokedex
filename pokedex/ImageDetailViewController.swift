@@ -55,7 +55,11 @@ class ImageDetailViewController: UIViewController {
     }
     
     func descriptionDownloaded() {
-        descriptionLabel.text = pokemon.descriptionString
+        let context = self.pokemon.managedObjectContext
+        context?.performBlock({
+            context?.refreshAllObjects()
+            self.descriptionLabel.text = self.pokemon.descriptionString
+        })
     }
     
     private func gradientLayer() {

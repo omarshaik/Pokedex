@@ -48,7 +48,9 @@ class CollectionViewController: UIViewController {
     }
     
     func downloadFinished() {
-        refreshControl.endRefreshing()
+        dispatch_async(dispatch_get_main_queue()) {
+            self.refreshControl.endRefreshing()
+        }
     }
     
     func fetchMorePokemon() {
@@ -64,12 +66,16 @@ class CollectionViewController: UIViewController {
     }
     
     func downloadError() {
-        presentAlert(errorTitle, message: errorMessage, actionTitle: errorActionTitle)
+        dispatch_async(dispatch_get_main_queue()) {
+            self.presentAlert(self.errorTitle, message: self.errorMessage, actionTitle: self.errorActionTitle)
+        }
     }
     
     func dataUpdated() {
-        pokemonArray = PokemonDataProvider.fetchPokemon()
-        collectionView.reloadData()
+        dispatch_async(dispatch_get_main_queue()) {
+            self.pokemonArray = PokemonDataProvider.fetchPokemon()
+            self.collectionView.reloadData()
+        }
     }
 }
 

@@ -18,7 +18,7 @@ class PokemonDataProvider: NSObject {
         fetchRequest.sortDescriptors = [idSortDescriptor]
         
         do {
-            if let pokemonArray = try stack.context.executeFetchRequest(fetchRequest) as? [Pokemon] {
+            if let pokemonArray = try stack.mainContext.executeFetchRequest(fetchRequest) as? [Pokemon] {
                 return pokemonArray
             }
         } catch let error as NSError {
@@ -33,7 +33,7 @@ class PokemonDataProvider: NSObject {
         fetchRequest.predicate = NSPredicate(format: "id == %d", id)
         
         do {
-            if let pokemonArray = try stack.context.executeFetchRequest(fetchRequest) as? [Pokemon] {
+            if let pokemonArray = try stack.mainContext.executeFetchRequest(fetchRequest) as? [Pokemon] {
                 return pokemonArray.first
             }
         } catch {
@@ -42,8 +42,27 @@ class PokemonDataProvider: NSObject {
         
         return nil
     }
+
+    class func fetchPokemonInBackgroundForID(id: UInt) -> Pokemon? {
+        let fetchRequest = NSFetchRequest(entityName: Pokemon.entityName())
+        fetchRequest.predicate = NSPredicate(format: "id == %d", id)
+
+        do {
+            if let pokemonArray = try stack.backgroundContext.executeFetchRequest(fetchRequest) as? [Pokemon] {
+                return pokemonArray.first
+            }
+        } catch {
+
+        }
+
+        return nil
+    }
     
-    class func save() {
-        stack.saveContext()
+    class func saveMainContext() {
+        stack.saveMainContext()
+    }
+
+    class func saveBackgroundContext() {
+        stack.saveBackgroundContext()
     }
 }

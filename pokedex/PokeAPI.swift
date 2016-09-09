@@ -109,24 +109,26 @@ struct PokeAPI {
             
             if let data = data {
                 if let jsonDict = try? NSJSONSerialization.JSONObjectWithData(data, options: .AllowFragments) {
-                    dispatch_async(dispatch_get_main_queue(), {
-                        guard let name = jsonDict["name"] as? String else {
-                            return
-                        }
-                    
+                    guard let name = jsonDict["name"] as? String else {
+                        return
+                    }
+
+                    let context = (UIApplication.sharedApplication().delegate as! AppDelegate).stack.backgroundContext
+
+                    context.performBlock({
                         var pokemon: Pokemon
-                        if let pokemonInDB = PokemonDataProvider.fetchPokemonForID(id) {
+                        if let pokemonInDB = PokemonDataProvider.fetchPokemonInBackgroundForID(id) {
                             pokemon = pokemonInDB
                         } else {
-                            pokemon = Pokemon(id: id, name: name.capitalizedString)
+                            pokemon = Pokemon(id: id, name: name.capitalizedString, context: context)
                         }
-                        
+
                         if let spritesDict = jsonDict["sprites"] as? [String:AnyObject] {
                             if let imageURLString = spritesDict["front_default"] as? String {
                                 pokemon.urlString = imageURLString
                             }
                         }
-                        
+
                         if let typeDictArray = jsonDict["types"] as? [[String:AnyObject]] {
                             for typeDict in typeDictArray {
                                 if let typeDictionary = typeDict["type"] as? [String:String] {
@@ -138,21 +140,21 @@ struct PokeAPI {
                                 }
                             }
                         }
-                        
-                        PokemonDataProvider.save()
-                        
-                        session.getAllTasksWithCompletionHandler({ tasks in
-                            if tasks.count == 0 {
-                                if let completion = completion {
-                                    completion(allDownloadsCompleted: true, error: nil)
-                                }
+
+                        PokemonDataProvider.saveBackgroundContext()
+                    })
+
+                    session.getAllTasksWithCompletionHandler({ tasks in
+                        if tasks.count == 0 {
+                            if let completion = completion {
+                                completion(allDownloadsCompleted: true, error: nil)
                             }
-                        })
+                        }
                     })
                 }
             }
         }
-        
+
         task.taskDescription = "\(id)"
         
         task.resume()
@@ -168,8 +170,7 @@ struct PokeAPI {
             }
             if let data = data {
                 if let json = try? NSJSONSerialization.JSONObjectWithData(data, options: .AllowFragments){
-                    dispatch_async(dispatch_get_main_queue(), {
-                        guard let pokemon = PokemonDataProvider.fetchPokemonForID(id) else {
+                        guard let pokemon = PokemonDataProvider.fetchPokemonInBackgroundForID(id) else {
                             return
                         }
                         
@@ -179,7 +180,7 @@ struct PokeAPI {
                                     if let language = languageDict["name"] where language == "en" {
                                         if let description = descDict["description"] as? String {
                                             pokemon.descriptionString = description
-                                            PokemonDataProvider.save()
+                                            PokemonDataProvider.saveBackgroundContext()
                                             
                                             let note = NSNotification(name: "PokemonDescriptionDidFinishDownloading", object: nil)
                                             
@@ -189,8 +190,6 @@ struct PokeAPI {
                                 }
                             }
                         }
-                        
-                    })
                 }
             }
         }
@@ -217,7 +216,7 @@ struct PokeAPI {
             if let data = data {
                 dispatch_async(dispatch_get_main_queue(), {
                     pokemon.imageData = data
-                    PokemonDataProvider.save()
+                    PokemonDataProvider.saveMainContext()
                     let image = UIImage(data: data)
                     if let completion = completion {
                         completion(image: image, error: nil)
